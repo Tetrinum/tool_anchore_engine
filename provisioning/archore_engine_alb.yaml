@@ -1,0 +1,68 @@
+---
+Description: Archore-Engine Container Image Scanning System Load Balancer
+Parameters:
+  Subnets:
+    Description: A list of subnet IDs to associate with the load balancer.
+    Type: CommaDelimitedList
+  VpcId:
+    Description: The physical ID of the VP
+    Type: 'AWS::EC2::VPC::Id'
+Resources:
+  LoadBalancerListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn:
+            Ref: LoadBalancerTargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 8228
+      Protocol: HTTP
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: False
+      Scheme: internet-facing
+      SecurityGroups:
+        - Ref: LoadBalancerSecurityGroup
+      Subnets:
+        Ref: Subnets
+  LoadBalancerTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 120
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
+      Port: 8228
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 20
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Ref: VpcId
+  LoadBalancerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Load balancer security group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8228
+          ToPort: 8228
+          CidrIp: 0.0.0.0/0
+      VpcId:
+        Ref: VpcId
+Outputs:
+  LoadBalancerDNSName:
+    Description: Load Balancer Name
+    Value: !GetAtt LoadBalancer.DNSName
+  LoadBalancerTargetGroupName:
+    Value:
+      Ref: LoadBalancerTargetGroup

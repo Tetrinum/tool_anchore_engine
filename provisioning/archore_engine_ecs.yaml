@@ -1,0 +1,207 @@
+Description: Demo Archore-Engine Container Security Scanner
+Parameters:
+  Cluster:
+    Description: ID of ECS cluster to deploy into
+    Type: String
+  ClusterSize:
+    Description: Nominal size of deployment
+    Type: String
+    Default: 1
+  DeploymentID:
+    Description: Deployment ID
+    Type: String
+  TargetGroup:
+    Description: Target Group to use for ECS service
+    Type: String
+  DemoArchoreEngineDockerImage:
+    Description: Docker image for Archore-Engine container
+    Type: String
+  DemoArchoreDatabaseDockerImage:
+    Description: Docker image for Archore database container
+    Type: String
+  SecretsBucket:
+    Description: Bucket containing secrets file
+    Type: String
+  SecretsFile:
+    Description: File containing Archore-Engine Secrets
+    Type: String
+Resources:
+  Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      TaskRoleArn:
+        Fn::GetAtt:
+        - TaskRole
+        - Arn
+      ContainerDefinitions:
+      - Name: anchore-engine
+        Hostname: anchore-engine
+        Cpu: 512
+        MemoryReservation: 1536
+        Essential: true
+        Image:
+          Ref: DemoArchoreEngineDockerImage
+        LogConfiguration:
+          LogDriver: syslog
+        PortMappings:
+        - HostPort: 8228
+          ContainerPort: 8228
+        - HostPort: 8338
+          ContainerPort: 8338
+        DockerSecurityOptions:
+        - apparmor:docker-default
+        DependsOn: anchore-db
+        Environment:
+        - Name: ANCHORE_HOST_ID
+          Value: dockerhostid-anchore-engine
+        - Name: ANCHORE_ENDPOINT_HOSTNAME
+          Value: anchore-engine
+        - Name: AWS_DEFAULT_REGION
+          Value:
+            Ref: AWS::Region
+        - Name: region
+          Value:
+            Ref: AWS::Region
+        - Name: secrets_bucket
+          Value:
+            Ref: SecretsBucket
+        - Name: secrets_file
+          Value:
+            Ref: SecretsFile
+      - Name: anchore-db
+        Hostname: anchore-db
+        Cpu: 512
+        MemoryReservation: 1536
+        Essential: true
+        Image:
+          Ref: DemoArchoreDatabaseDockerImage
+        LogConfiguration:
+          LogDriver: syslog
+        PortMappings:
+        - HostPort: 2345
+          ContainerPort: 5432
+        DockerSecurityOptions:
+        - apparmor:docker-default
+        Environment:
+        - Name: POSTGRES_PASSWORD
+          Value: mysecretpassword
+        - Name: PGDATA
+          Value: /var/lib/postgresql/data/pgdata/
+        - Name: AWS_DEFAULT_REGION
+          Value:
+            Ref: AWS::Region
+        - Name: region
+          Value:
+            Ref: AWS::Region
+        - Name: secrets_bucket
+          Value:
+            Ref: SecretsBucket
+        - Name: secrets_file
+          Value:
+            Ref: SecretsFile
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AmazonEC2ContainerServiceRole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:AuthorizeSecurityGroupIngress
+            - ec2:Describe*
+            - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+            - elasticloadbalancing:Describe*
+            - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+            - elasticloadbalancing:DeregisterTargets
+            - elasticloadbalancing:DescribeTargetGroups
+            - elasticloadbalancing:DescribeTargetHealth
+            - elasticloadbalancing:RegisterTargets
+            - "*"
+            Resource: "*"
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs-tasks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: ECSTaskDefinitionContainerRole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - kms:Encrypt
+            - kms:Decrypt
+            Resource: "*"
+      - PolicyName: DemoAppContainerRole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:BatchGetItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:GetItem
+            - dynamodb:ListTables
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - "*"
+            Resource: "*"
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: Cluster
+      DesiredCount:
+        Ref: ClusterSize
+      TaskDefinition:
+        Ref: Task
+      Role:
+        Ref: Role
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      LoadBalancers:
+      - ContainerName: anchore-engine
+        ContainerPort: 8228
+        TargetGroupArn:
+          Ref: TargetGroup
+      PlacementStrategies:
+      - Type: spread
+        Field: attribute:ecs.availability-zone
+      -
+        Type: spread
+        Field: instanceId
+Outputs:
+  Cluster:
+    Value:
+      Ref: Cluster
+  Service:
+    Value:
+      Ref: Service
+  Task:
+    Value:
+      Ref: Task
+  DeploymentID:
+    Value:
+      Ref: DeploymentID
+AWSTemplateFormatVersion: '2010-09-09'

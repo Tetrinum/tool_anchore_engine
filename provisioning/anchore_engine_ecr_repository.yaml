@@ -1,0 +1,41 @@
+---
+Description: Demo ECR Repository
+Parameters:
+  AppRepoName:
+    Type: String
+  DBRepoName:
+    Type: String
+Resources:
+  AppECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref AppRepoName
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - "ecr:*"
+  DatabaseECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref DBRepoName
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - "ecr:*"
+Outputs:
+  DemoAppECRRepository:
+    Value: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref "AppECRRepository"]]
+  DemoDBECRRepository:
+    Value: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref "DatabaseECRRepository"]]
