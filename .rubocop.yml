@@ -1,0 +1,21 @@
+require: rubocop-performance
+
+# Common configuration.
+AllCops:
+  # Include gemspec and Rakefile
+  Include:
+    - '**/*.gemspec'
+  Exclude:
+    - 'Gemfile'
+    - 'Rakefile'
+    - 'Guardfile'
+    - 'bin/**'
+    - 'tmp/**/*'
+Metrics/BlockLength:
+  Enabled: false
+Naming/FileName:
+  Enabled: false
+Metrics/AbcSize:
+  Enabled: false
+LineLength:
+  Enabled: false
